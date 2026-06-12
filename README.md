@@ -1,6 +1,6 @@
 # Chart Analyzer AI — Android App — v1.9
 
-An advanced Android application for chart analysis using **28 technical analysis frameworks** (including Moon Cycle Strategy), real-time Binance market data, TradingView Lightweight Charts and a GB + LSTM ensemble ML prediction engine with 51 features.
+An advanced Android application for chart analysis using **28 technical analysis frameworks**, real-time Binance market data, TradingView Lightweight Charts and a GB + LSTM ensemble ML prediction engine with 51 features.
 
 ---
 
