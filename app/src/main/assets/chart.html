@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Chart</title>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #0d1117; overflow: hidden; }
+  #chart-container { width: 100%; height: calc(100% - 44px); position: relative; }
+
+  /* Info box */
+  #info-box {
+    position: absolute; top: 8px; left: 8px;
+    background: rgba(13,17,23,0.92); border: 1px solid #2d333b;
+    border-radius: 8px; padding: 8px 10px;
+    font-family: -apple-system,'Roboto',sans-serif; font-size: 11px; color: #c9d1d9;
+    pointer-events: none; z-index: 100; min-width: 175px; backdrop-filter: blur(4px);
+  }
+  #info-box .symbol-row { font-size:13px;font-weight:600;color:#f0f6fc;margin-bottom:4px;display:flex;align-items:center;gap:6px; }
+  .signal-badge { font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.5px; }
+  .badge-STRONG_BUY  { background:#00e676; color:#000; }
+  .badge-BUY         { background:#26a69a; color:#fff; }
+  .badge-NEUTRAL     { background:#4a5568; color:#fff; }
+  .badge-SELL        { background:#ef9a9a; color:#000; }
+  .badge-STRONG_SELL { background:#ff1744; color:#fff; }
+  #info-box .ohlc-row { display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:4px 0;font-size:10px; }
+  #info-box .ohlc-item { display:flex;flex-direction:column; }
+  #info-box .ohlc-label { color:#6e7681;font-size:9px; }
+  .metric-row { display:flex;justify-content:space-between;align-items:center;margin-top:3px;font-size:10px; }
+  .metric-label { color:#6e7681; }
+  .metric-val { font-weight:500; }
+  .bar-container { height:5px;background:#2d333b;border-radius:3px;overflow:hidden;flex:1;margin-left:6px; }
+  .bar-fill { height:100%;border-radius:3px;transition:width 0.3s; }
+
+  /* ML Panel */
+  #ml-panel {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(13,17,23,0.93); border: 1px solid #1f6feb;
+    border-radius: 8px; padding: 8px 10px;
+    font-family: -apple-system,'Roboto',sans-serif; font-size:10px; color:#c9d1d9;
+    z-index:100; min-width:155px; backdrop-filter:blur(4px); pointer-events:none; display:none;
+  }
+  #ml-panel.visible { display:block; }
+  .ml-title { font-size:11px;font-weight:700;color:#388bfd;margin-bottom:6px; }
+  .ml-section-lbl { font-size:9px;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;margin:5px 0 3px; }
+  .ml-row { display:flex;justify-content:space-between;align-items:center;margin:2px 0; }
+  .ml-lbl { color:#8b949e; }
+  .ml-val { font-weight:600; }
+  .ml-bar-row { display:flex;align-items:center;gap:4px;margin:2px 0; }
+  .ml-bar-lbl { color:#6e7681;width:30px;font-size:9px; }
+  .ml-bar-wrap { flex:1;height:4px;background:#2d333b;border-radius:2px;overflow:hidden; }
+  .ml-bar-fill { height:100%;border-radius:2px;transition:width 0.4s; }
+  .ml-val-sm { width:30px;text-align:right;font-size:9px; }
+
+  /* Feature importance panel */
+  #feat-panel {
+    position:absolute;bottom:50px;right:8px;
+    background:rgba(13,17,23,0.93);border:1px solid #2d333b;
+    border-radius:8px;padding:8px 10px;
+    font-family:-apple-system,'Roboto',sans-serif;font-size:9px;color:#c9d1d9;
+    z-index:100;min-width:160px;backdrop-filter:blur(4px);pointer-events:none;display:none;
+  }
+  #feat-panel.visible { display:block; }
+  .feat-title { font-size:10px;font-weight:600;color:#f0f6fc;margin-bottom:5px; }
+  .feat-row { display:flex;align-items:center;gap:4px;margin:2px 0; }
+  .feat-name { flex:1;color:#8b949e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .feat-bar-wrap { width:50px;height:4px;background:#2d333b;border-radius:2px;overflow:hidden; }
+  .feat-bar-fill { height:100%;background:#388bfd;border-radius:2px; }
+  .feat-val { width:28px;text-align:right;color:#388bfd;font-weight:600; }
+
+  /* Traditional prediction panel */
+  #pred-panel {
+    position:absolute;top:8px;right:8px;
+    background:rgba(13,17,23,0.92);border:1px solid #2d333b;
+    border-radius:8px;padding:8px 10px;
+    font-family:-apple-system,'Roboto',sans-serif;font-size:10px;color:#c9d1d9;
+    z-index:99;min-width:140px;backdrop-filter:blur(4px);pointer-events:none;
+  }
+  #pred-panel.ml-active { display:none; }
+  .pred-title { font-size:11px;font-weight:600;color:#f0f6fc;margin-bottom:5px; }
+  .pred-row { display:flex;justify-content:space-between;margin:2px 0; }
+  .pred-lbl { color:#6e7681; } .pred-val { font-weight:500; }
+
+  /* Toolbar */
+  #toolbar {
+    height:44px;display:flex;align-items:center;
+    padding:0 6px;gap:3px;background:#0d1117;
+    border-top:1px solid #2d333b;overflow-x:auto;
+  }
+  .tf-btn {
+    padding:4px 8px;border-radius:5px;border:1px solid #2d333b;
+    background:transparent;color:#8b949e;font-size:11px;font-weight:500;
+    cursor:pointer;white-space:nowrap;transition:all .15s;
+  }
+  .tf-btn.active { background:#1f6feb;border-color:#1f6feb;color:#fff; }
+  .tf-btn:hover:not(.active) { background:#161b22;color:#c9d1d9; }
+  .divider { width:1px;height:20px;background:#2d333b;margin:0 2px;flex-shrink:0; }
+  .toggle-btn {
+    padding:4px 8px;border-radius:5px;border:1px solid #2d333b;
+    background:transparent;color:#8b949e;font-size:10px;cursor:pointer;white-space:nowrap;transition:all .15s;
+  }
+  .toggle-btn.on { border-color:#388bfd;color:#388bfd; }
+  .toggle-btn.ml-on { border-color:#bc8cff;color:#bc8cff;background:rgba(188,140,255,.08); }
+
+  /* Loading */
+  #loading {
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    background:#0d1117;z-index:200;gap:10px;color:#8b949e;font-family:-apple-system;font-size:13px;
+  }
+  .spinner { width:24px;height:24px;border:2px solid #2d333b;border-top-color:#1f6feb;border-radius:50%;animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loading.hidden { display:none; }
+
+  /* Color utilities */
+  .green { color:#3fb950; } .red { color:#f85149; }
+  .blue { color:#388bfd; } .purple { color:#bc8cff; }
+  .orange { color:#e3b341; }
+</style>
+</head>
+<body>
+<div id="loading"><div class="spinner"></div><span>Loading chart data...</span></div>
+
+<div id="chart-container">
+
+  <!-- Left: OHLCV + TA signals info box -->
+  <div id="info-box">
+    <div class="symbol-row">
+      <span id="ib-symbol">--</span>
+      <span class="signal-badge badge-NEUTRAL" id="ib-signal">NEUTRAL</span>
+    </div>
+    <div class="ohlc-row">
+      <div class="ohlc-item"><span class="ohlc-label">O</span><span id="ib-open">--</span></div>
+      <div class="ohlc-item"><span class="ohlc-label">H</span><span id="ib-high" style="color:#3fb950">--</span></div>
+      <div class="ohlc-item"><span class="ohlc-label">L</span><span id="ib-low" style="color:#f85149">--</span></div>
+      <div class="ohlc-item"><span class="ohlc-label">C</span><span id="ib-close">--</span></div>
+    </div>
+    <div class="metric-row"><span class="metric-label">Vol</span><span class="metric-val" id="ib-vol">--</span></div>
+    <div style="margin-top:5px;border-top:1px solid #2d333b;padding-top:5px;">
+      <div class="metric-row">
+        <span class="metric-label">Buy</span>
+        <div class="bar-container"><div class="bar-fill" id="buy-bar" style="background:#00e676;width:0%"></div></div>
+        <span class="metric-val green" id="ib-buy" style="margin-left:5px">0</span>
+      </div>
+      <div class="metric-row" style="margin-top:3px">
+        <span class="metric-label">Sell</span>
+        <div class="bar-container"><div class="bar-fill" id="sell-bar" style="background:#ff1744;width:0%"></div></div>
+        <span class="metric-val red" id="ib-sell" style="margin-left:5px">0</span>
+      </div>
+      <div class="metric-row" style="margin-top:3px">
+        <span class="metric-label">Conf</span>
+        <div class="bar-container"><div class="bar-fill" id="conf-bar" style="background:#bc8cff;width:0%"></div></div>
+        <span class="metric-val purple" id="ib-conf" style="margin-left:5px">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: ML Ensemble panel (shown when ML toggled on) -->
+  <div id="ml-panel">
+    <div class="ml-title">🤖 ML Ensemble</div>
+    <div class="ml-row"><span class="ml-lbl">Signal</span><span class="ml-val" id="ml-signal" style="color:#4a5568">--</span></div>
+    <div class="ml-row"><span class="ml-lbl">Agree</span><span class="ml-val blue" id="ml-agree">--</span></div>
+    <div class="ml-row"><span class="ml-lbl">Confidence</span><span class="ml-val purple" id="ml-conf-val">--</span></div>
+    <div class="ml-section-lbl">Buy Probability (0-100%)</div>
+    <div class="ml-bar-row">
+      <span class="ml-bar-lbl">GB</span>
+      <div class="ml-bar-wrap"><div class="ml-bar-fill" id="ml-gb-buy-bar" style="background:#00b0ff;width:0%"></div></div>
+      <span class="ml-val-sm green" id="ml-gb-buy">0%</span>
+    </div>
+    <div class="ml-bar-row">
+      <span class="ml-bar-lbl">LSTM</span>
+      <div class="ml-bar-wrap"><div class="ml-bar-fill" id="ml-lstm-buy-bar" style="background:#69f0ae;width:0%"></div></div>
+      <span class="ml-val-sm green" id="ml-lstm-buy">0%</span>
+    </div>
+    <div class="ml-bar-row">
+      <span class="ml-bar-lbl">Ens.</span>
+      <div class="ml-bar-wrap"><div class="ml-bar-fill" id="ml-ens-buy-bar" style="background:#00e676;width:0%"></div></div>
+      <span class="ml-val-sm green" id="ml-ens-buy">0%</span>
+    </div>
+    <div class="ml-section-lbl">Sell Probability (0-100%)</div>
+    <div class="ml-bar-row">
+      <span class="ml-bar-lbl">GB</span>
+      <div class="ml-bar-wrap"><div class="ml-bar-fill" id="ml-gb-sell-bar" style="background:#ff6d00;width:0%"></div></div>
+      <span class="ml-val-sm red" id="ml-gb-sell">0%</span>
+    </div>
+    <div class="ml-bar-row">
+      <span class="ml-bar-lbl">LSTM</span>
+      <div class="ml-bar-wrap"><div class="ml-bar-fill" id="ml-lstm-sell-bar" style="background:#ef9a9a;width:0%"></div></div>
+      <span class="ml-val-sm red" id="ml-lstm-sell">0%</span>
+    </div>
+    <div class="ml-section-lbl">Targets</div>
+    <div class="ml-row"><span class="ml-lbl">Target</span><span class="ml-val green" id="ml-target">--</span></div>
+    <div class="ml-row"><span class="ml-lbl">Stop</span><span class="ml-val red" id="ml-stop">--</span></div>
+  </div>
+
+  <!-- Feature importance panel (bottom right, toggled by Feat button) -->
+  <div id="feat-panel">
+    <div class="feat-title">📊 GB Feature Importance</div>
+    <div id="feat-list"></div>
+  </div>
+
+  <!-- Traditional prediction panel (hides when ML active) -->
+  <div id="pred-panel">
+    <div class="pred-title">🎯 TA Prediction</div>
+    <div class="pred-row"><span class="pred-lbl">Target</span><span class="pred-val green" id="pp-target">--</span></div>
+    <div class="pred-row"><span class="pred-lbl">Stop</span><span class="pred-val red" id="pp-stop">--</span></div>
+    <div class="pred-row"><span class="pred-lbl">R:R</span><span class="pred-val orange" id="pp-rr">--</span></div>
+    <div class="pred-row"><span class="pred-lbl">Source</span><span class="pred-val" id="pp-source" style="font-size:9px;max-width:80px;text-align:right">--</span></div>
+  </div>
+
+  <!-- Lunar phase panel (bottom-left, above info-box when active) -->
+  <div id="moon-panel" style="
+    position:absolute;bottom:8px;left:8px;
+    background:rgba(13,17,23,0.93);
+    border:1px solid rgba(200,180,255,0.3);
+    border-radius:8px;padding:8px 10px;
+    font-family:-apple-system,'Roboto',sans-serif;font-size:10px;color:#c9d1d9;
+    z-index:100;min-width:148px;backdrop-filter:blur(4px);pointer-events:none;display:none;">
+    <div style="font-size:12px;font-weight:700;color:#e8d5ff;margin-bottom:5px;display:flex;align-items:center;gap:6px;">
+      <span id="moon-emoji" style="font-size:16px;">🌑</span>
+      <span id="moon-phase-label">New Moon</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin:2px 0;">
+      <span style="color:#6e7681;">Age</span>
+      <span id="moon-age" style="font-weight:500;">-- days</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin:2px 0;">
+      <span style="color:#6e7681;">Illumination</span>
+      <span id="moon-illum" style="font-weight:500;color:#e8d5ff;">--%</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin:2px 0;">
+      <span style="color:#6e7681;">Cycle Bias</span>
+      <span id="moon-bias" style="font-weight:600;">--</span>
+    </div>
+    <div style="margin:5px 0 3px;font-size:9px;color:#6e7681;text-transform:uppercase;letter-spacing:.5px;">Next Events</div>
+    <div style="display:flex;justify-content:space-between;margin:2px 0;">
+      <span style="color:#6e7681;">🌑 New Moon</span>
+      <span id="moon-to-new" style="color:#69f0ae;font-weight:500;">-- d</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin:2px 0;">
+      <span style="color:#6e7681;">🌕 Full Moon</span>
+      <span id="moon-to-full" style="color:#ffd60a;font-weight:500;">-- d</span>
+    </div>
+    <!-- Illumination progress bar -->
+    <div style="margin-top:6px;height:4px;background:#2d333b;border-radius:2px;overflow:hidden;">
+      <div id="moon-illum-bar" style="height:100%;background:linear-gradient(90deg,#a78bfa,#ffd60a);border-radius:2px;width:0%;transition:width .4s;"></div>
+    </div>
+  </div>
+
+</div><!-- end chart-container -->
+
+<div id="toolbar">
+  <button class="tf-btn" onclick="setTf('1m')">1m</button>
+  <button class="tf-btn" onclick="setTf('5m')">5m</button>
+  <button class="tf-btn" onclick="setTf('15m')">15m</button>
+  <button class="tf-btn" onclick="setTf('30m')">30m</button>
+  <button class="tf-btn active" onclick="setTf('1h')">1h</button>
+  <button class="tf-btn" onclick="setTf('4h')">4h</button>
+  <button class="tf-btn" onclick="setTf('1d')">1D</button>
+  <div class="divider"></div>
+  <button class="toggle-btn on" id="btn-vol"   onclick="toggleLayer('vol')">Vol</button>
+  <button class="toggle-btn on" id="btn-buy"   onclick="toggleLayer('buy')">Buy</button>
+  <button class="toggle-btn on" id="btn-sell"  onclick="toggleLayer('sell')">Sell</button>
+  <button class="toggle-btn on" id="btn-conf"  onclick="toggleLayer('conf')">Conf</button>
+  <button class="toggle-btn on" id="btn-zones" onclick="toggleLayer('zones')">Zones</button>
+  <button class="toggle-btn on" id="btn-sig"   onclick="toggleLayer('sig')">Sig</button>
+  <div class="divider"></div>
+  <button class="toggle-btn on" id="btn-moon" onclick="toggleLayer('moon')">🌙</button>
+  <button class="toggle-btn" id="btn-ml"   onclick="toggleLayer('ml')">ML</button>
+  <button class="toggle-btn" id="btn-gb"   onclick="toggleLayer('gb')">GB</button>
+  <button class="toggle-btn" id="btn-lstm" onclick="toggleLayer('lstm')">LSTM</button>
+  <button class="toggle-btn" id="btn-feat" onclick="toggleLayer('feat')">Feat</button>
+</div>
+
+<script>
+// ─── DOM helper — defined first so all functions can use it ──────────────────
+const el = id => document.getElementById(id);
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let chart, candleSeries, volumeSeries;
+let buyStrengthSeries, sellStrengthSeries, confidenceSeries;
+// ML series
+let gbBuySeries, lstmBuySeries, gbSellSeries, lstmSellSeries, mlConfSeries;
+let mlTargetLine = null, mlStopLine = null;
+// Lunar / Moon Cycle series
+let moonIllumSeries = null;   // illumination % overlaid on signal pane
+let moonLayerVisible = true;
+let moonMarkers = [];          // New Moon / Full Moon event markers
+
+let priceLines = {};
+let taMarkers = [], mlMarkers = [];
+let mlLayerVisible = false, featPanelVisible = false;
+let config = { showVol:true,showBuy:true,showSell:true,showConf:true,showZones:true,showSig:true };
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+function initChart() {
+  const c = document.getElementById('chart-container');
+  chart = LightweightCharts.createChart(c, {
+    width: c.clientWidth, height: c.clientHeight,
+    layout: { background:{type:'solid',color:'#0d1117'}, textColor:'#8b949e',
+              fontFamily:"-apple-system,'Roboto',sans-serif", fontSize:11 },
+    grid: { vertLines:{color:'#161b22',style:1}, horzLines:{color:'#161b22',style:1} },
+    crosshair: { mode:LightweightCharts.CrosshairMode.Normal,
+                 vertLine:{color:'#4a5568',labelBackgroundColor:'#1f2937'},
+                 horzLine:{color:'#4a5568',labelBackgroundColor:'#1f2937'} },
+    rightPriceScale: { borderColor:'#2d333b', textColor:'#8b949e' },
+    timeScale: { borderColor:'#2d333b', timeVisible:true, secondsVisible:false },
+    handleScroll:{mouseWheel:true,pressedMouseMove:true},
+    handleScale:{axisPressedMouseMove:true,mouseWheel:true,pinch:true},
+  });
+
+  // Candlesticks
+  candleSeries = chart.addCandlestickSeries({
+    upColor:'#26a69a',downColor:'#ef5350',
+    borderUpColor:'#26a69a',borderDownColor:'#ef5350',
+    wickUpColor:'#26a69a',wickDownColor:'#ef5350', priceScaleId:'right',
+  });
+
+  // Volume
+  volumeSeries = chart.addHistogramSeries({
+    color:'#2d333b', priceFormat:{type:'volume'},
+    priceScaleId:'vol', scaleMargins:{top:0.85,bottom:0},
+  });
+  chart.priceScale('vol').applyOptions({ scaleMargins:{top:0.85,bottom:0}, borderVisible:false });
+
+  // TA signal series (bottom 28%)
+  const sigBase = { priceScaleId:'signals', scaleMargins:{top:0.72,bottom:0.02},
+    priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:true, crosshairMarkerRadius:3 };
+  buyStrengthSeries  = chart.addLineSeries({...sigBase, color:'#00e676', lineWidth:1, title:'Buy'});
+  sellStrengthSeries = chart.addLineSeries({...sigBase, color:'#ff1744', lineWidth:1, title:'Sell'});
+  confidenceSeries   = chart.addLineSeries({...sigBase, color:'#bc8cff', lineWidth:1,
+    lineStyle:LightweightCharts.LineStyle.Dashed, title:'Conf'});
+  chart.priceScale('signals').applyOptions({ scaleMargins:{top:0.72,bottom:0}, borderVisible:false, drawTicks:false });
+
+  // ML series (same bottom pane, initially hidden)
+  const mlBase = { priceScaleId:'ml', scaleMargins:{top:0.72,bottom:0.02},
+    priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:true, visible:false };
+  gbBuySeries    = chart.addLineSeries({...mlBase, color:'#00b0ff', lineWidth:2, title:'GB Buy'});
+  lstmBuySeries  = chart.addLineSeries({...mlBase, color:'#69f0ae', lineWidth:2,
+    lineStyle:LightweightCharts.LineStyle.Dashed, title:'LSTM Buy'});
+  gbSellSeries   = chart.addLineSeries({...mlBase, color:'#ff6d00', lineWidth:2, title:'GB Sell'});
+  lstmSellSeries = chart.addLineSeries({...mlBase, color:'#ef9a9a', lineWidth:2,
+    lineStyle:LightweightCharts.LineStyle.Dashed, title:'LSTM Sell'});
+  mlConfSeries   = chart.addLineSeries({...mlBase, color:'#bc8cff', lineWidth:1,
+    lineStyle:LightweightCharts.LineStyle.Dotted, title:'ML Conf'});
+  chart.priceScale('ml').applyOptions({ scaleMargins:{top:0.72,bottom:0}, borderVisible:false, drawTicks:false });
+
+  // ── Moon Cycle illumination series ───────────────────────────────────────────
+  // Plots the lunar illumination percentage (0–100%) as a dashed gold/silver line
+  // on the signal pane — visual overlay showing where in the 29.53-day cycle we are
+  moonIllumSeries = chart.addLineSeries({
+    priceScaleId: 'signals',
+    scaleMargins: { top: 0.72, bottom: 0.02 },
+    color: '#ffd60a',      // gold for moon
+    lineWidth: 1,
+    lineStyle: LightweightCharts.LineStyle.SparseDotted,
+    priceLineVisible: false,
+    lastValueVisible: false,
+    crosshairMarkerVisible: true,
+    crosshairMarkerRadius: 3,
+    title: '🌙',
+    visible: true,
+  });
+
+  // Crosshair
+  chart.subscribeCrosshairMove(param => {
+    if (!param.time || !param.seriesData) return;
+    const candle = param.seriesData.get(candleSeries);
+    if (candle) {
+      el('ib-open').textContent  = fp(candle.open);
+      el('ib-high').textContent  = fp(candle.high);
+      el('ib-low').textContent   = fp(candle.low);
+      el('ib-close').textContent = fp(candle.close);
+      el('ib-close').style.color = candle.close >= candle.open ? '#3fb950' : '#f85149';
+    }
+    const vol = param.seriesData.get(volumeSeries);
+    if (vol) el('ib-vol').textContent = fv(vol.value);
+    const buy = param.seriesData.get(buyStrengthSeries);
+    const sell = param.seriesData.get(sellStrengthSeries);
+    const conf = param.seriesData.get(confidenceSeries);
+    if (buy||sell||conf) updateTABars(buy?.value??0, sell?.value??0, conf?.value??0);
+    // ML crosshair
+    if (mlLayerVisible) {
+      const gbB  = param.seriesData.get(gbBuySeries);
+      const lstB = param.seriesData.get(lstmBuySeries);
+      const gbS  = param.seriesData.get(gbSellSeries);
+      const lstS = param.seriesData.get(lstmSellSeries);
+      const mc   = param.seriesData.get(mlConfSeries);
+      if (gbB||lstB) {
+        const ensB = ((gbB?.value??0)*0.55 + (lstB?.value??0)*0.45);
+        const ensS = ((gbS?.value??0)*0.55 + (lstS?.value??0)*0.45);
+        updateMLBars(gbB?.value??0, lstB?.value??0, ensB, gbS?.value??0, lstS?.value??0);
+        if (mc) { el('ml-conf-val').textContent = Math.round(mc.value)+'%'; }
+      }
+    }
+  });
+
+  new ResizeObserver(() => chart.applyOptions({width:c.clientWidth,height:c.clientHeight})).observe(c);
+}
+
+// ─── Full chart load ──────────────────────────────────────────────────────────
+function setChartData(payload) {
+  const d = typeof payload==='string' ? JSON.parse(payload) : payload;
+  el('loading').classList.add('hidden');
+  el('ib-symbol').textContent = (d.symbol||'--') + ' ' + (d.interval||'');
+  updateTfButtons(d.interval||'1h');
+
+  if (d.candles?.length > 0) {
+    candleSeries.setData(d.candles.map(c=>({time:c.t,open:c.o,high:c.h,low:c.l,close:c.c})));
+    volumeSeries.setData(d.candles.map(c=>({time:c.t,value:c.v,
+      color:c.c>=c.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'})));
+    const last = d.candles[d.candles.length-1];
+    el('ib-open').textContent=fp(last.o); el('ib-high').textContent=fp(last.h);
+    el('ib-low').textContent=fp(last.l);  el('ib-close').textContent=fp(last.c);
+    el('ib-vol').textContent=fv(last.v);
+  }
+  if (d.buyStrength)  buyStrengthSeries.setData(d.buyStrength.map(p=>({time:p[0],value:p[1]})));
+  if (d.sellStrength) sellStrengthSeries.setData(d.sellStrength.map(p=>({time:p[0],value:p[1]})));
+  if (d.confidence)   confidenceSeries.setData(d.confidence.map(p=>({time:p[0],value:p[1]})));
+
+  if (d.signals?.length > 0) {
+    taMarkers = d.signals.map(s=>mkMk(s.t,s.type,s.conf,false));
+    rebuildMarkers();
+  }
+  clearPriceLines();
+  if (d.zones?.length > 0 && config.showZones) d.zones.forEach(addPriceLine);
+  if (d.lastSignal) updateTAInfoBox(d.lastSignal);
+
+  // ── Lunar data ────────────────────────────────────────────────────────────
+  if (d.moonIllum)  moonIllumSeries.setData(d.moonIllum.map(p=>({time:p[0],value:p[1]})));
+  if (d.lunar)      updateLunarPanel(d.lunar);
+  if (d.moonIllum)  buildMoonMarkers(d.candles, d.moonIllum);
+
+  chart.timeScale().fitContent();
+}
+
+// ─── Live tick (non-closed) ───────────────────────────────────────────────────
+function updateCandle(payload) {
+  const c = (typeof payload==='string'?JSON.parse(payload):payload).candle;
+  if (!c) return;
+  candleSeries.update({time:c.t,open:c.o,high:c.h,low:c.l,close:c.c});
+  volumeSeries.update({time:c.t,value:c.v,color:c.c>=c.o?'rgba(38,166,154,.5)':'rgba(239,83,80,.5)'});
+  el('ib-open').textContent=fp(c.o); el('ib-high').textContent=fp(c.h);
+  el('ib-low').textContent=fp(c.l);  el('ib-close').textContent=fp(c.c);
+  el('ib-close').style.color = c.c>=c.o?'#3fb950':'#f85149';
+  el('ib-vol').textContent=fv(c.v);
+}
+
+// ─── Candle close — TA update ─────────────────────────────────────────────────
+function onCandleClose(payload) {
+  const d = typeof payload==='string'?JSON.parse(payload):payload;
+  if (d.buyStrength)  buyStrengthSeries.update({time:d.buyStrength[0],value:d.buyStrength[1]});
+  if (d.sellStrength) sellStrengthSeries.update({time:d.sellStrength[0],value:d.sellStrength[1]});
+  if (d.confidence)   confidenceSeries.update({time:d.confidence[0],value:d.confidence[1]});
+  if (d.signal && d.signal.type!=='NEUTRAL' && config.showSig) {
+    taMarkers.push(mkMk(d.signal.t,d.signal.type,d.signal.conf,false));
+    taMarkers.sort((a,b)=>a.time-b.time);
+    rebuildMarkers();
+    updateTAInfoBox(d.signal);
+  }
+  if (d.zones && config.showZones) { clearPriceLines(); d.zones.forEach(addPriceLine); }
+  // Lunar updates on candle close
+  if (d.lunar) updateLunarPanel(d.lunar);
+  if (d.moonIllumPoint && moonLayerVisible) {
+    try { moonIllumSeries.update({time:d.moonIllumPoint[0], value:d.moonIllumPoint[1]}); } catch(e){}
+  }
+}
+
+// ─── ML Prediction: single real-time prediction ───────────────────────────────
+function onMlPrediction(payload) {
+  const d = typeof payload==='string'?JSON.parse(payload):payload;
+  // Always update ML series (even if panel hidden — data ready when toggled)
+  try { gbBuySeries.update({time:d.t,value:d.gbBuy}); } catch(e){}
+  try { lstmBuySeries.update({time:d.t,value:d.lstmBuy}); } catch(e){}
+  try { gbSellSeries.update({time:d.t,value:d.gbSell}); } catch(e){}
+  try { lstmSellSeries.update({time:d.t,value:d.lstmSell}); } catch(e){}
+  try { mlConfSeries.update({time:d.t,value:d.confidence}); } catch(e){}
+
+  if (d.signal!=='NEUTRAL' && mlLayerVisible) {
+    mlMarkers.push(mkMk(d.t,d.signal,d.confidence/100.0,true));
+    mlMarkers.sort((a,b)=>a.time-b.time);
+    rebuildMarkers();
+  }
+  updateMLPanel(d);
+  updateMLPriceLines(d);
+  if (d.topFeatures?.length>0 && featPanelVisible) renderFeatures(d.topFeatures);
+}
+
+// ─── ML History: push all historical predictions at once ─────────────────────
+function setMlHistory(payload) {
+  const arr = typeof payload==='string'?JSON.parse(payload):payload;
+  if (!Array.isArray(arr)||arr.length===0) return;
+  const gbBD=[],lstmBD=[],gbSD=[],lstmSD=[],mcD=[];
+  mlMarkers=[];
+  arr.forEach(d=>{
+    gbBD.push({time:d.t,value:d.gbBuy});
+    lstmBD.push({time:d.t,value:d.lstmBuy});
+    gbSD.push({time:d.t,value:d.gbSell});
+    lstmSD.push({time:d.t,value:d.lstmSell});
+    mcD.push({time:d.t,value:d.confidence});
+    if (d.signal!=='NEUTRAL') mlMarkers.push(mkMk(d.t,d.signal,d.confidence/100.0,true));
+  });
+  try { gbBuySeries.setData(gbBD); lstmBuySeries.setData(lstmBD);
+        gbSellSeries.setData(gbSD); lstmSellSeries.setData(lstmSD);
+        mlConfSeries.setData(mcD); } catch(e){}
+  mlMarkers.sort((a,b)=>a.time-b.time);
+  rebuildMarkers();
+  const last=arr[arr.length-1];
+  updateMLPanel(last);
+  if (last.topFeatures) renderFeatures(last.topFeatures);
+}
+
+// ─── Show/hide ML overlay ─────────────────────────────────────────────────────
+function setMlLayerVisible(visible) {
+  mlLayerVisible = visible;
+  el('btn-ml').classList.toggle('ml-on', visible);
+  [gbBuySeries,lstmBuySeries,gbSellSeries,lstmSellSeries,mlConfSeries].forEach(s=>{
+    try { s.applyOptions({visible:visible}); } catch(e){}
+  });
+  el('ml-panel').classList.toggle('visible', visible);
+  el('pred-panel').classList.toggle('ml-active', visible);
+  rebuildMarkers();
+  if (visible) updateMLPriceLines(null); // re-draw if we have data
+}
+
+// ─── ML panel updater ─────────────────────────────────────────────────────────
+function updateMLPanel(d) {
+  if (!d) return;
+  const col = d.signal?.includes('BUY')?'#3fb950':d.signal?.includes('SELL')?'#f85149':'#8b949e';
+  const sigEl = el('ml-signal');
+  sigEl.textContent = (d.signal||'--').replace(/_/g,' ');
+  sigEl.style.color = col;
+  el('ml-agree').textContent = Math.round(d.agreement??0)+'%';
+  el('ml-conf-val').textContent = Math.round(d.confidence??0)+'%';
+  const ensB = d.buyPct ?? ((d.gbBuy??0)*0.55+(d.lstmBuy??0)*0.45);
+  updateMLBars(d.gbBuy??0, d.lstmBuy??0, ensB, d.gbSell??0, d.lstmSell??0);
+  el('ml-target').textContent = d.target ? fp(d.target) : '--';
+  el('ml-stop').textContent   = d.stop   ? fp(d.stop)   : '--';
+}
+
+function updateMLBars(gbB,lstmB,ensB,gbS,lstmS) {
+  sb('ml-gb-buy-bar',  'ml-gb-buy',   gbB);
+  sb('ml-lstm-buy-bar','ml-lstm-buy', lstmB);
+  sb('ml-ens-buy-bar', 'ml-ens-buy',  ensB);
+  sb('ml-gb-sell-bar', 'ml-gb-sell',  gbS);
+  sb('ml-lstm-sell-bar','ml-lstm-sell',lstmS);
+}
+function sb(barId, valId, val) {
+  const pct = Math.min(100, Math.max(0, val||0));
+  el(barId).style.width = pct+'%';
+  el(valId).textContent = Math.round(pct)+'%';
+}
+
+// ─── ML price lines ───────────────────────────────────────────────────────────
+function updateMLPriceLines(d) {
+  if (mlTargetLine) { try{candleSeries.removePriceLine(mlTargetLine);}catch(e){} mlTargetLine=null; }
+  if (mlStopLine)   { try{candleSeries.removePriceLine(mlStopLine);}catch(e){}   mlStopLine=null; }
+  if (!mlLayerVisible || !d) return;
+  if (d.target) {
+    mlTargetLine = candleSeries.createPriceLine({
+      price:d.target, color:'#3fb950', lineWidth:1,
+      lineStyle:LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible:true, title:'🎯 ML Target',
+    });
+  }
+  if (d.stop) {
+    mlStopLine = candleSeries.createPriceLine({
+      price:d.stop, color:'#f85149', lineWidth:1,
+      lineStyle:LightweightCharts.LineStyle.Dashed,
+      axisLabelVisible:true, title:'⛔ ML Stop',
+    });
+  }
+}
+
+// ─── Lunar / Moon Cycle functions ────────────────────────────────────────────
+
+function updateLunarPanel(lunar) {
+  if (!lunar) return;
+  const age = parseFloat(lunar.age) || 0;
+  const illum = parseFloat(lunar.illum) || 0;
+  const score = parseFloat(lunar.score) || 0;
+  const isWaxing = !!lunar.isWaxing;
+  const daysToNew  = parseFloat(lunar.daysToNew)  || 0;
+  const daysToFull = parseFloat(lunar.daysToFull) || 0;
+
+  el('moon-emoji').textContent        = lunar.emoji  || '🌑';
+  el('moon-phase-label').textContent  = lunar.phase  || '--';
+  el('moon-age').textContent          = age.toFixed(1) + ' d';
+  el('moon-illum').textContent        = Math.round(illum) + '%';
+  el('moon-illum-bar').style.width    = Math.min(100, illum) + '%';
+  el('moon-to-new').textContent       = daysToNew.toFixed(1)  + ' d';
+  el('moon-to-full').textContent      = daysToFull.toFixed(1) + ' d';
+
+  // Lunar bias label
+  const biasEl = el('moon-bias');
+  if (illum < 5 || illum > 95) {
+    biasEl.textContent = illum < 5 ? '🟢 Buy Zone' : '⚠️ Watch';
+    biasEl.style.color = illum < 5 ? '#3fb950' : '#ffd60a';
+  } else if (isWaxing) {
+    biasEl.textContent = '↑ Waxing';
+    biasEl.style.color = '#69f0ae';
+  } else {
+    biasEl.textContent = '↓ Waning';
+    biasEl.style.color = '#ef9a9a';
+  }
+}
+
+// Build New Moon and Full Moon event markers from illumination series
+function buildMoonMarkers(candles, moonIllum) {
+  if (!moonIllum || !candles) return;
+  moonMarkers = [];
+  for (let i = 1; i < moonIllum.length - 1; i++) {
+    const prev = moonIllum[i-1][1];
+    const curr = moonIllum[i][1];
+    const next = moonIllum[i+1][1];
+    const t = moonIllum[i][0];
+    // New Moon: illumination near 0 and at local minimum
+    if (curr < 5 && curr <= prev && curr <= next) {
+      moonMarkers.push({
+        time: t, position: 'inBar',
+        color: '#a78bfa', shape: 'circle',
+        text: '🌑 New', size: 1
+      });
+    }
+    // Full Moon: illumination near 100 and at local maximum
+    else if (curr > 95 && curr >= prev && curr >= next) {
+      moonMarkers.push({
+        time: t, position: 'inBar',
+        color: '#ffd60a', shape: 'circle',
+        text: '🌕 Full', size: 1
+      });
+    }
+  }
+  rebuildMarkers();
+}
+
+function setLunarLayerVisible(visible) {
+  moonLayerVisible = visible;
+  const btn = el('btn-moon');
+  btn.classList.toggle('on', visible);
+  try { moonIllumSeries.applyOptions({visible: visible}); } catch(e){}
+  el('moon-panel').style.display = visible ? 'block' : 'none';
+  rebuildMarkers();
+}
+
+// ─── Feature importance ───────────────────────────────────────────────────────
+function renderFeatures(features) {
+  const list = el('feat-list');
+  list.innerHTML = '';
+  const maxScore = features[0]?.score ?? 1;
+  features.slice(0,8).forEach(f=>{
+    const pct = Math.round((f.score/maxScore)*100);
+    const row = document.createElement('div');
+    row.className = 'feat-row';
+    row.innerHTML = `<span class="feat-name">${f.name.replace(/_/g,' ')}</span>`+
+      `<div class="feat-bar-wrap"><div class="feat-bar-fill" style="width:${pct}%"></div></div>`+
+      `<span class="feat-val">${pct}</span>`;
+    list.appendChild(row);
+  });
+}
+
+// ─── TA Info box ──────────────────────────────────────────────────────────────
+function updateTAInfoBox(sig) {
+  const badge = el('ib-signal');
+  badge.textContent = sig.type.replace(/_/g,' ');
+  badge.className = 'signal-badge badge-'+sig.type;
+  updateTABars(sig.buyStrength??0, sig.sellStrength??0, (sig.confidence??0)*100);
+  el('pp-target').textContent = sig.target ? fp(sig.target):'--';
+  el('pp-stop').textContent   = sig.stop   ? fp(sig.stop)  :'--';
+  el('pp-rr').textContent     = sig.rr     ? sig.rr.toFixed(2)+'x':'--';
+  el('pp-source').textContent = sig.source ? sig.source.replace(/_/g,' '):'--';
+}
+function updateTABars(buy,sell,conf) {
+  el('buy-bar').style.width  = Math.min(100,buy)+'%';
+  el('sell-bar').style.width = Math.min(100,sell)+'%';
+  el('conf-bar').style.width = Math.min(100,conf)+'%';
+  el('ib-buy').textContent   = Math.round(buy);
+  el('ib-sell').textContent  = Math.round(sell);
+  el('ib-conf').textContent  = Math.round(conf)+'%';
+}
+
+// ─── Price lines (TA zones) ───────────────────────────────────────────────────
+function clearPriceLines() {
+  Object.values(priceLines).forEach(pl=>{try{candleSeries.removePriceLine(pl);}catch(e){}});
+  priceLines={};
+}
+function addPriceLine(z) {
+  try {
+    priceLines[z.id] = candleSeries.createPriceLine({
+      price:z.price,color:z.color,lineWidth:z.width||1,
+      lineStyle:z.dash?LightweightCharts.LineStyle.Dashed:LightweightCharts.LineStyle.Solid,
+      axisLabelVisible:true,title:z.label,
+    });
+  } catch(e){}
+}
+
+// ─── Markers ──────────────────────────────────────────────────────────────────
+function mkMk(t, type, conf, isML) {
+  const isBuy=type.includes('BUY'), strong=type.includes('STRONG');
+  return {
+    time:t,
+    position:isBuy?'belowBar':'aboveBar',
+    color:isML
+      ?(isBuy?(strong?'#00b0ff':'#69f0ae'):(strong?'#ff6d00':'#ef9a9a'))
+      :(isBuy?(strong?'#00e676':'#69f0ae'):(strong?'#ff1744':'#ff6d00')),
+    shape:isBuy?'arrowUp':'arrowDown',
+    text:(isML?'ML ':'')+
+         (strong?(isBuy?'▲▲':'▼▼'):(isBuy?'▲':'▼'))+
+         ' '+Math.round((conf??0)*100)+'%',
+    size:strong?2:1,
+  };
+}
+function rebuildMarkers() {
+  const all=[...taMarkers,...(mlLayerVisible?mlMarkers:[]),...(moonLayerVisible?moonMarkers:[])];
+  all.sort((a,b)=>a.time-b.time);
+  try { candleSeries.setMarkers(config.showSig?all:[]); } catch(e){}
+}
+
+// ─── Toolbar ──────────────────────────────────────────────────────────────────
+function setTf(tf) {
+  updateTfButtons(tf);
+  if (window.ChartBridge) window.ChartBridge.onTimeframeChange(tf);
+}
+function updateTfButtons(active) {
+  document.querySelectorAll('.tf-btn').forEach(b=>{
+    b.classList.toggle('active',
+      b.textContent.toLowerCase()===active.toLowerCase()||
+      (active==='1d'&&b.textContent==='1D'));
+  });
+}
+function toggleLayer(name) {
+  const btn = el('btn-'+name);
+  if (!btn) return;
+  if (name==='ml')  { setMlLayerVisible(btn.classList.toggle('ml-on')); return; }
+  if (name==='moon'){ setLunarLayerVisible(btn.classList.toggle('on')); return; }
+  if (name==='gb')  { const on=btn.classList.toggle('ml-on');
+    [gbBuySeries,gbSellSeries].forEach(s=>{try{s.applyOptions({visible:on});}catch(e){}});return; }
+  if (name==='lstm'){ const on=btn.classList.toggle('ml-on');
+    [lstmBuySeries,lstmSellSeries].forEach(s=>{try{s.applyOptions({visible:on});}catch(e){}});return; }
+  if (name==='feat'){ featPanelVisible=btn.classList.toggle('ml-on');
+    el('feat-panel').classList.toggle('visible',featPanelVisible);return; }
+  const on=btn.classList.toggle('on');
+  if (name==='vol')   volumeSeries.applyOptions({visible:on});
+  if (name==='buy')   buyStrengthSeries.applyOptions({visible:on});
+  if (name==='sell')  sellStrengthSeries.applyOptions({visible:on});
+  if (name==='conf')  confidenceSeries.applyOptions({visible:on});
+  if (name==='zones') { config.showZones=on; if(!on) clearPriceLines(); }
+  if (name==='sig')   { config.showSig=on; rebuildMarkers(); }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function fp(p) {
+  if (p==null) return '--'; p=parseFloat(p);
+  if (p>=1000) return p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if (p>=1)    return p.toFixed(4);
+  if (p>=0.01) return p.toFixed(6);
+  return p.toFixed(8);
+}
+function fv(v) {
+  if (!v) return '--'; v=parseFloat(v);
+  if (v>=1e9) return (v/1e9).toFixed(2)+'B';
+  if (v>=1e6) return (v/1e6).toFixed(2)+'M';
+  if (v>=1e3) return (v/1e3).toFixed(2)+'K';
+  return v.toFixed(2);
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  initChart();
+  if (window.ChartBridge) window.ChartBridge.onChartReady();
+});
+</script>
+</body>
+</html>

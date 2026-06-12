@@ -1,0 +1,20 @@
+// Top-level build file
+buildscript {
+    ext {
+        kotlin_version = '1.9.22'
+        compose_version = '1.6.1'
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // AGP 8.9.2 is the last stable 8.x release — supports both Gradle 8.6+ and Gradle 9.x
+        classpath 'com.android.tools.build:gradle:8.9.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
+}

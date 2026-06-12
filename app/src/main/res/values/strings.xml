@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Chart Analyzer AI</string>
+    <string name="tab_analyze">Analyze</string>
+    <string name="tab_markets">Markets</string>
+    <string name="tab_frameworks">Frameworks</string>
+    <string name="tab_formulas">Formulas</string>
+    <string name="tab_history">History</string>
+    <string name="upload_chart">Upload Chart Image</string>
+    <string name="analyze_button">Analyze Chart</string>
+    <string name="api_key_hint">Enter Anthropic API Key</string>
+    <string name="binance_live">Live via Binance WebSocket</string>
+</resources>

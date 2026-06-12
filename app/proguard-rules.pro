@@ -1,0 +1,4 @@
+-keep class com.chartanalyzer.app.models.** { *; }
+-keep class com.chartanalyzer.app.api.** { *; }
+-dontwarn okhttp3.**
+-keep class okhttp3.** { *; }
