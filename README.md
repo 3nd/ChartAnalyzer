@@ -1,61 +1,10 @@
 # Chart Analyzer AI — Android App — v1.9
 
-An advanced Android application for stock/crypto chart analysis using **28 technical analysis frameworks** (including Moon Cycle Strategy), real-time Binance market data, TradingView Lightweight Charts with lunar phase overlay, and a GB + LSTM ensemble ML prediction engine with 51 features.
+An advanced Android application for chart analysis using **28 technical analysis frameworks** (including Moon Cycle Strategy), real-time Binance market data, TradingView Lightweight Charts and a GB + LSTM ensemble ML prediction engine with 51 features.
 
 ---
 
 ## Changelog
-
-### v1.7 (Current)
-**Moon Cycle Strategy — Full Integration**
-
-**Mathematical Framework (already in TechnicalFrameworks.kt, now fully wired):**
-- Astronomical foundation: Julian Day Number formula, JD₀ = 2451550.09765 (Jan 6 2000 18:14 UTC reference New Moon)
-- `LunarAge = (JD − JD₀) mod 29.530588853 days` — exact synodic period
-- `φ = (LunarAge / S) × 360°` — phase angle
-- `I = (1 − cos(φ × π/180)) / 2` — illumination fraction 0–1
-- `Moon_Score = sin(φ) × (1 − |I − 0.5| × 0.5)` — composite ∈ [−1, +1]
-- `Reversal_Proximity = 1 − min(age, S−age) / (S/4)` — 1.0 at exact New/Full Moon
-- `VOL_Multiplier = 1 + 0.15 × cos²(2φ)` — peaks at 0° and 180°
-- Montgomery dates: buy at New Moon ±1 day, exit at Full Moon ±1 day (~14.77d hold)
-- Academic basis: Yuan/Zheng/Zhu 2006; Dichev/Janes 2001; Lausanne 20yr study (+3.3% α/yr)
-
-**Signal Engine integration:**
-- `MOON_CYCLE` added to `SignalSource` enum
-- `moonCycleScore()` added to `SignalEngine` — implements Moon_Score with trend alignment weighting (full weight waxing+uptrend, half weight misaligned), volume confirmation factor, and reversal proximity boost (up to +30%)
-- Weight 0.7 in composite — supplementary timing bias, not primary signal
-
-**ML Feature Engineering (FeatureEngineer.kt):**
-- 6 new lunar features added to `FeatureVector`: `lunarAge` (norm 0–1), `lunarIllumination`, `lunarMomentum` (sin φ), `lunarReversalProx`, `isNewMoonWindow`, `isFullMoonWindow`
-- Feature count: 45 → **51**
-- Moon Cycle features highlighted in ML FeaturesTab with gold color and 🌙 icon
-
-**State Management (CandleStateManager.kt):**
-- `CandleState` now includes: `lunarAge`, `lunarIllumination`, `lunarPhase` (enum with emoji), `lunarScore`, `lunarReversalProximity`, `moonPhaseSeries`, `moonIlluminationSeries`
-- Both `initWithHistory()` and `processClosedCandles()` compute full lunar state on every candle
-
-**Chart (chart.html):**
-- `moonIllumSeries` — gold dotted line on signal pane showing lunar illumination 0–100%
-- `moon-panel` — bottom-left info panel: phase emoji + label, age, illumination bar, cycle bias, countdown to next New/Full Moon
-- `buildMoonMarkers()` — auto-places 🌑 (purple) New Moon and 🌕 (gold) Full Moon event markers directly on candlestick series
-- `setLunarLayerVisible()` — callable from Kotlin or toolbar toggle
-- 🌙 toolbar toggle button (on by default)
-
-**UI (TvChartScreen.kt):**
-- `LunarPhaseStrip` — compact horizontal bar below chart: phase emoji, bias label, age/illumination/score, countdown chip to next New/Full Moon
-- Moon emoji toggle in top bar (shows current phase emoji when active, 🌙 when off)
-- ML FeaturesTab: lunar features shown in dedicated gold section with descriptions
-
-**TvChartViewModel.kt:**
-- `toggleLunarOverlay()` — controls both Compose strip and chart.html layer
-- `TvChartUiState` includes all lunar fields + `daysToNextNewMoon` / `daysToNextFullMoon`
-- Lunar JSON payload sent in both `setChartData` and `onCandleClose` messages
-
-**Training UI (MLScreens.kt):**
-- Info card in Training tab noting 51 features including 6 lunar
-- `HigLunarFeatureRow` / `HigFeatureRow` — Apple HIG-styled feature importance rows with lunar features in gold
-
-**Note:** The Moon Cycle Strategy is provided as a supplementary timing tool. No statistically validated causal mechanism linking lunar phases to market prices is established. Use alongside proven technical indicators and proper risk management.
 - Version code bumped to 8
 **Apple Human Interface Guidelines UI Overhaul**
 
